@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openedx-account-lock-ext"
+version = "0.1.0"
+description = "Managed demo accounts for Open edX Teak"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "AGPL-3.0-only"}
+dependencies = [
+  "Django>=4.2,<5", "djangorestframework>=3.14,<3.16",
+  "edx-opaque-keys>=2,<5", "openedx-filters>=2.0.1,<3", "edx-django-utils>=7,<8",
+]
+
+[project.optional-dependencies]
+tutor = ["tutor>=20,<21", "tutor-mfe>=20,<21"]
+test = ["pytest", "pytest-django", "pytest-cov", "tox", "edx-drf-extensions==10.6.0", "tutor>=20,<21"]
+quality = ["pylint", "pycodestyle", "pydocstyle", "isort", "mypy", "django-stubs", "djangorestframework-stubs"]
+
+[project.entry-points."lms.djangoapp"]
+openedx_account_lock_ext = "openedx_account_lock_ext.apps:AccountLockConfig"
+[project.entry-points."cms.djangoapp"]
+openedx_account_lock_ext = "openedx_account_lock_ext.apps:AccountLockConfig"
+[project.entry-points."tutor.plugin.v1"]
+account-lock = "tutoraccountlock.plugin"
+
+[tool.setuptools.packages.find]
+include = ["openedx_account_lock_ext*", "tutoraccountlock*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+testpaths = ["tests"]
+addopts = "--cov=openedx_account_lock_ext --cov=tutoraccountlock --cov-report=term-missing"
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
+exclude = ["tests"]
+
+[tool.pylint.main]
+load-plugins = []
+[tool.pylint.format]
+max-line-length = 120
+[tool.pylint.messages_control]
+disable = ["too-few-public-methods", "import-outside-toplevel", "fixme"]
