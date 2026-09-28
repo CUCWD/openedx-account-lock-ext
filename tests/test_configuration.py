@@ -27,11 +27,30 @@ def test_invalid_courses(settings, value, code):
     assert code in {error.id for error in account_lock_checks(None)}
 
 
-@pytest.mark.parametrize("fallback", ["//evil.test/", "https://evil.test", "/profile", "/api/user/v1/accounts"])
+@pytest.mark.parametrize(
+    "fallback",
+    [
+        "//evil.test/",
+        "https://evil.test",
+        "https://apps.example.org:1996/profile",
+        "/profile",
+        "/api/user/v1/accounts",
+    ],
+)
 def test_unsafe_fallback(settings, fallback):
     """Bad fallbacks fail checks before deployment."""
     settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = fallback
     assert "account_lock.E002" in {error.id for error in account_lock_checks(None)}
+
+
+def test_configured_mfe_fallback(settings):
+    """Development may use the allowlisted learner-dashboard MFE origin."""
+    settings.OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS = [
+        "https://apps.example.org",
+        "https://apps.example.org:1996",
+    ]
+    settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "https://apps.example.org:1996/learner-dashboard/"
+    assert "account_lock.E002" not in {error.id for error in account_lock_checks(None)}
 
 
 def test_missing_integrations(settings):

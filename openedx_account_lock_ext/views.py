@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from . import conf, courses
 from .identity import is_locked
-from .responses import json_denial
+from .responses import json_denial, mfe_gateway_blocked
 
 
 class GatewayAuthorization(APIView):
@@ -41,7 +41,7 @@ class GatewayAuthorization(APIView):
             if "\\" in path or "%" in path or any(part in {".", ".."} for part in path.split("/")):
                 return json_denial()
             if conf.matches_any(path, ("/account", "/profile")):
-                return json_denial()
+                return mfe_gateway_blocked(request)
             if conf.matches(path, "/learning/course"):
                 candidate = HttpRequest()
                 candidate.path_info = path
@@ -49,13 +49,13 @@ class GatewayAuthorization(APIView):
                 candidate.GET = QueryDict(parsed.query)
                 try:
                     if not courses.allowed(courses.resolve(candidate, {})):
-                        return json_denial()
+                        return mfe_gateway_blocked(request)
                 except courses.UnresolvedCourse:
-                    return json_denial()
+                    return mfe_gateway_blocked(request)
             else:
                 # Caddy may normalize paths differently (case, repeated slashes).
                 # This endpoint authorizes only the specifically gated surfaces.
-                return json_denial()
+                return mfe_gateway_blocked(request)
         response = HttpResponse(status=204)
         response["Cache-Control"] = "no-store, private"
         response["Vary"] = "Cookie, Authorization"

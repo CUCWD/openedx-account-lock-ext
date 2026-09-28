@@ -26,19 +26,35 @@ def account_lock_checks(app_configs, **kwargs):  # pylint: disable=unused-argume
     fallback = conf.get("FALLBACK_URL")
     try:
         parsed = urlsplit(fallback)
-        valid = (
+        path = parsed.path
+        origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+        is_local_path = (
             fallback.startswith("/")
             and not fallback.startswith("//")
-            and "\\" not in fallback
             and not parsed.netloc
             and not parsed.scheme
-            and not conf.matches_any(parsed.path, conf.get("RESTRICTED_PAGE_PATHS"))
-            and not conf.matches_any(parsed.path, conf.get("RESTRICTED_API_PREFIXES"))
+        )
+        is_configured_mfe_url = (
+            origin in set(conf.get("MFE_ORIGINS"))
+            and parsed.scheme in {"http", "https"}
+            and bool(path)
+        )
+        valid = (
+            (is_local_path or is_configured_mfe_url)
+            and "\\" not in fallback
+            and path.startswith("/")
+            and not conf.matches_any(path, conf.get("RESTRICTED_PAGE_PATHS"))
+            and not conf.matches_any(path, conf.get("RESTRICTED_API_PREFIXES"))
         )
     except (TypeError, ValueError):
         valid = False
     if not valid:
-        errors.append(Error("Fallback must be a safe, unrestricted local path.", id="account_lock.E002"))
+        errors.append(
+            Error(
+                "Fallback must be a safe, unrestricted local path or configured MFE URL.",
+                id="account_lock.E002",
+            )
+        )
     middleware = list(settings.MIDDLEWARE)
     if MIDDLEWARE not in middleware:
         errors.append(Error("Managed account middleware is missing.", id="account_lock.E003"))

@@ -54,7 +54,7 @@ OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS = (
     "course-v1:YourOrg+Demo101+2026",
     "course-v1:YourOrg+Demo102+2026",
 )
-OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "/dashboard"
+OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "/learner-dashboard"
 OPENEDX_ACCOUNT_LOCK_RESTRICTED_PAGE_PATHS = (
     "/account/settings", "/account/password", "/account/email", "/profile",
 )
@@ -65,9 +65,11 @@ enrollment. Catalogs remain browsable. IDs must be opaque course keys, not displ
 numbers. Existing enrollments in disallowed courses do not grant access. No automatic enrollment
 is performed; use normal Open edX enrollment tools after provisioning.
 
-The Tutor plugin exposes `ACCOUNT_LOCK_ALLOWED_COURSE_IDS` (a YAML list) and
-`ACCOUNT_LOCK_FALLBACK_URL`. Set these in Tutor configuration before `tutor config save`.
-It renders the equivalent Django settings in LMS and CMS.
+The Tutor account-lock plugin owns `ACCOUNT_LOCK_ALLOWED_COURSE_IDS` and
+`ACCOUNT_LOCK_FALLBACK_URL`, rendering the equivalent Django settings in LMS and CMS. Keep
+account-lock settings out of unrelated Tutor plugins so a later patch cannot overwrite the
+allowlist. The default local course is `course-v1:diffOrg+DemoX+summer_2026`, and the fallback is
+`/learner-dashboard`.
 
 `OPENEDX_ACCOUNT_LOCK_RESTRICTED_API_PREFIXES` includes the requested six prefixes plus
 `/api/profile_images/` and `/api/change_email_settings`. Replacing this setting replaces the whole
@@ -105,9 +107,11 @@ The middleware is synchronous; Django adapts it for ASGI without leaking request
 The Tutor patch adds Caddy `forward_auth` for `/account`, `/profile`, and `/learning/course`
 and their descendants. It authenticates against the LMS endpoint using existing cookies or the
 Authorization header. Caddy overwrites the original-URL header; no asserted user-ID header is trusted.
-The endpoint validates that original URL against `OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS`, returns 204
-for an allowed request, and JSON 403 for a blocked request. It never redirects an API/MFE request
-to an HTML page. Responses are private and uncached.
+The endpoint validates the original URL against `OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS`, returns 204
+for an allowed request, and returns JSON 403 for direct/API requests. Caddy marks its MFE
+authorization subrequest with `X-Account-Lock-MFE-Gateway: 1`; blocked MFE entries receive a safe
+302 to their referring page, or to `/learner-dashboard` when the referrer is missing or unsafe.
+Responses are private and uncached.
 
 Production origins are derived from `ENABLE_HTTPS` and `MFE_HOST`. The configured external scheme
 is used even when the proxy-to-Caddy hop is HTTP. Ensure auth cookies actually reach the MFE host
@@ -118,7 +122,8 @@ Webpack development servers bypass the production MFE Caddy server. Put the deve
 behind the same gateway (proxy its allowed requests onward to the webpack port), or treat that
 server as unprotected. Add exact origins with ports, for example
 `http://apps.local.openedx.io:1997`, to `OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS`; never use wildcards.
-Simply setting `MFE_GATEWAY_ENABLED=True` does not install a development reverse proxy.
+Simply setting `MFE_GATEWAY_ENABLED=True` does not install a development reverse proxy, and
+opening the webpack server directly cannot exercise the redirect behavior.
 
 Without Tutor, install equivalent gateway rules and configure `MFE_ORIGINS` and
 `MFE_GATEWAY_ENABLED=True`. `REQUIRE_MFE_GATEWAY=False` is only for installations that do not serve

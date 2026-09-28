@@ -23,7 +23,7 @@ def test_restricted_pages(logged, path):
     """Protected HTML pages never reach their view."""
     response = logged.get(path)
     assert response.status_code == 302
-    assert response.url == "/dashboard"
+    assert response.url == "/learner-dashboard"
     assert [str(message) for message in get_messages(response.wsgi_request)] == [
         "This page is restricted for managed accounts.",
     ]
@@ -126,17 +126,17 @@ def test_bearer_without_session(client, locked):
     [
         ("http://testserver/welcome?x=1", "http://testserver/welcome?x=1"),
         ("/welcome", "/welcome"),
-        (None, "/dashboard"),
-        ("https://evil.test/", "/dashboard"),
-        ("//evil.test/", "/dashboard"),
-        ("javascript:alert(1)", "/dashboard"),
-        ("http://testserver@evil.test/", "/dashboard"),
-        ("/profile/demo", "/dashboard"),
-        ("/account/settings", "/dashboard"),
-        ("/courses/course-v1:Other+X+Run/courseware", "/dashboard"),
-        ("/learning/course/course-v1:Other+X+Run/home", "/dashboard"),
-        ("/account", "/dashboard"),
-        ("\\\\evil.test", "/dashboard"),
+        (None, "/learner-dashboard"),
+        ("https://evil.test/", "/learner-dashboard"),
+        ("//evil.test/", "/learner-dashboard"),
+        ("javascript:alert(1)", "/learner-dashboard"),
+        ("http://testserver@evil.test/", "/learner-dashboard"),
+        ("/profile/demo", "/learner-dashboard"),
+        ("/account/settings", "/learner-dashboard"),
+        ("/courses/course-v1:Other+X+Run/courseware", "/learner-dashboard"),
+        ("/learning/course/course-v1:Other+X+Run/home", "/learner-dashboard"),
+        ("/account", "/learner-dashboard"),
+        ("\\\\evil.test", "/learner-dashboard"),
     ],
 )
 def test_referrers(logged, referrer, expected):
@@ -150,7 +150,7 @@ def test_https_and_fallback(logged, settings):
     settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "/welcome"
     assert logged.get("/profile", secure=True, HTTP_REFERER="http://testserver/old").url == "/welcome"
     settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "https://evil.test"
-    assert logged.get("/profile").url == "/dashboard"
+    assert logged.get("/profile").url == "/learner-dashboard"
 
 
 def test_group_cache_per_request(logged, locked, django_assert_num_queries, rf):

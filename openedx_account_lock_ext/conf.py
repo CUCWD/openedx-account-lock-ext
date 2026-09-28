@@ -5,7 +5,7 @@ from django.conf import settings
 GROUP = "locked_account"
 DEFAULTS = {
     "ALLOWED_COURSE_IDS": (),
-    "FALLBACK_URL": "/dashboard",
+    "FALLBACK_URL": "/learner-dashboard/",
     "RESTRICTED_PAGE_PATHS": ("/account/settings", "/account/password", "/account/email", "/profile"),
     "RESTRICTED_API_PREFIXES": (
         "/api/user/v1/accounts/",
