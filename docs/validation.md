@@ -3,7 +3,7 @@
 Verified on 2026-09-17: **141 standalone tests passed**, **2 custom-user-model tests passed**,
 and standalone plugin statement coverage was **90%**. The complete tox quality environment passed
 (pylint 10/10, pycodestyle, pydocstyle, isort, mypy), as did Django checks. Native LMS and CMS URL/
-callback checks and Caddy configuration validation passed. Wheel and source builds passed Twine
+callback checks passed. Wheel and source builds passed Twine
 metadata validation. These results do not include the data-backed acceptance suite below.
 
 ## Automated checks
@@ -59,26 +59,8 @@ the package/ensure its distribution metadata is available so native plugin disco
 The initial image default (`lms.envs.tutor.development`) required absent deployment settings; the
 test-settings retry required an isolated `test_root`. Both were addressed without modifying core.
 
-## Tutor and Caddy validation
-
-Tutor configuration was rendered in `/private/tmp/account-lock-tutor`, not the user's Tutor root:
-
-```bash
-TUTOR_ROOT=/private/tmp/account-lock-tutor TUTOR_PLUGINS_ROOT=/private/tmp/account-lock-tutor-plugins \
-  /private/tmp/account-lock-venv/bin/tutor plugins enable mfe account-lock
-TUTOR_ROOT=/private/tmp/account-lock-tutor TUTOR_PLUGINS_ROOT=/private/tmp/account-lock-tutor-plugins \
-  /private/tmp/account-lock-venv/bin/tutor config save \
-  --set LMS_HOST=learn.example.org --set CMS_HOST=studio.learn.example.org \
-  --set MFE_HOST=apps.learn.example.org --set ENABLE_HTTPS=true
-
-docker run --rm --network none \
-  --mount type=bind,source=/private/tmp/account-lock-tutor/env/plugins/mfe/apps/mfe/Caddyfile,target=/tmp/AccountLock.Caddyfile,readonly \
-  --entrypoint caddy overhangio/openedx-mfe:20.1.0 \
-  validate --config /tmp/AccountLock.Caddyfile --adapter caddyfile
-```
-
-Caddy reports a valid configuration. Tutor's generated whitespace produces a harmless Caddy
-formatting warning. Gateway response/authentication behavior is also exercised by Django tests.
+Tutor gateway configuration is owned by the separately maintained [Tutor account-lock plugin](https://github.com/skilredi/tutor-skilredi-account-lock)
+and is not built or validated by this Django-only repository.
 
 ## Still required before deployment acceptance
 

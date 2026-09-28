@@ -3,7 +3,6 @@
 from types import SimpleNamespace
 
 import pytest
-from jinja2 import Environment, StrictUndefined
 
 from openedx_account_lock_ext.checks import account_lock_checks
 from openedx_account_lock_ext.settings.common import ENROLLMENT_FILTER, ENROLLMENT_STEP, MIDDLEWARE, plugin_settings
@@ -80,24 +79,3 @@ def test_idempotent_registration():
     assert settings.MIDDLEWARE.count(MIDDLEWARE) == 1
     assert settings.MIDDLEWARE.index(MIDDLEWARE) == 5
     assert settings.OPEN_EDX_FILTERS_CONFIG[ENROLLMENT_FILTER]["pipeline"] == [ENROLLMENT_STEP, "existing.step"]
-
-
-def test_tutor_patch_rendering():
-    """Render actual Tutor patch registrations without touching the user's Tutor root."""
-    from tutor import hooks
-
-    from tutoraccountlock import plugin  # noqa: F401
-
-    patches = list(hooks.Filters.ENV_PATCHES.iterate())
-    template = next(text for name, text in patches if name == "mfe-caddyfile" and "managed_account_surface" in text)
-    result = (
-        Environment(undefined=StrictUndefined)
-        .from_string(template)
-        .render(
-            ENABLE_HTTPS=True,
-            LMS_HOST="learn.example.org",
-        )
-    )
-    assert "forward_auth @managed_account_surface lms:8000" in result
-    assert "header_up Host learn.example.org" in result
-    assert "X-Account-Lock-Original-Url https://{host}{uri}" in result

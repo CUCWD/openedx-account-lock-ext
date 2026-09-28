@@ -15,24 +15,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-tutor = ["tutor>=20,<21", "tutor-mfe>=20,<21"]
-test = ["pytest", "pytest-django", "pytest-cov", "tox", "edx-drf-extensions==10.6.0", "tutor>=20,<21"]
+test = ["pytest", "pytest-django", "pytest-cov", "tox", "edx-drf-extensions==10.6.0"]
 quality = ["pylint", "pycodestyle", "pydocstyle", "isort", "mypy", "django-stubs", "djangorestframework-stubs"]
 
 [project.entry-points."lms.djangoapp"]
 openedx_account_lock_ext = "openedx_account_lock_ext.apps:AccountLockConfig"
 [project.entry-points."cms.djangoapp"]
 openedx_account_lock_ext = "openedx_account_lock_ext.apps:AccountLockConfig"
-[project.entry-points."tutor.plugin.v1"]
-account-lock = "tutoraccountlock.plugin"
 
 [tool.setuptools.packages.find]
-include = ["openedx_account_lock_ext*", "tutoraccountlock*"]
+include = ["openedx_account_lock_ext*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tests.settings"
 testpaths = ["tests"]
-addopts = "--cov=openedx_account_lock_ext --cov=tutoraccountlock --cov-report=term-missing"
+addopts = "--cov=openedx_account_lock_ext --cov-report=term-missing"
 
 [tool.isort]
 profile = "black"

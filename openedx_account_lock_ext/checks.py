@@ -80,7 +80,7 @@ def account_lock_checks(app_configs, **kwargs):  # pylint: disable=unused-argume
     if ENROLLMENT_STEP not in pipeline.get("pipeline", []) or pipeline.get("fail_silently", False):
         errors.append(Error("The enrollment guard must be configured and fail_silently=False.", id="account_lock.E005"))
     if conf.get("REQUIRE_MFE_GATEWAY") and not conf.get("MFE_GATEWAY_ENABLED"):
-        errors.append(Error("Enable the bundled Tutor MFE gateway integration.", id="account_lock.E006"))
+        errors.append(Error("Configure a gateway for independently served MFEs.", id="account_lock.E006"))
     if conf.get("MFE_GATEWAY_ENABLED") and not conf.get("MFE_ORIGINS"):
         errors.append(Error("Configure the exact MFE origins, including development ports.", id="account_lock.E007"))
     if not conf.get("ALLOWED_COURSE_IDS"):

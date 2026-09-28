@@ -79,7 +79,7 @@ def test_mfe_entry(client, locked, url, status):
     ],
 )
 def test_mfe_gateway_redirects_or_falls_back(client, locked, settings, url, referrer, expected):
-    """Caddy-marked MFE denials redirect to a safe referrer or the learner dashboard."""
+    """Gateway-marked MFE denials redirect to a safe referrer or the learner dashboard."""
     settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "http://apps.example.org:1996/learner-dashboard/"
     settings.OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS = [
         "https://apps.example.org",

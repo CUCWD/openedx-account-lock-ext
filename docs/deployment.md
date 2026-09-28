@@ -19,35 +19,23 @@ are included: `lms.djangoapp` and `cms.djangoapp`. Open edX discovers the app an
 automatically; do not also append a duplicate entry to `INSTALLED_APPS`. No plugin migrations are needed.
 The LMS discovers `/api/account-lock/v1/authorize` through `url_config`.
 
-For Tutor, install the source and optional Tutor dependencies in the Tutor host environment:
+Tutor deployments should install the gateway integration from the separately maintained
+[Tutor account-lock plugin repository](https://github.com/skilredi/tutor-skilredi-account-lock). This Django
+distribution does not include or install that plugin. Add this Django package to the LMS and CMS
+Python environments using your deployment's normal pinned package requirements, then rebuild those
+images and restart the services through your existing deployment process.
+
+Run Django system checks in both services after installation:
 
 ```bash
-python -m pip install -e '.[tutor]'
-tutor plugins enable account-lock
+./manage.py lms check
+./manage.py cms check
 ```
-
-That enables settings and gateway patches; **it does not install Python packages in the LMS image**.
-Publish your wheel to your package index or commit the source to your own repository, then add its
-pinned requirement to Tutor's existing `OPENEDX_EXTRA_PIP_REQUIREMENTS` list. Preserve other entries.
-A source requirement can be `git+https://YOUR-REPOSITORY/openedx-account-lock-ext.git@PINNED-COMMIT`.
-No public package index release is assumed. Rebuild the `openedx` and `mfe` images and restart
-LMS, CMS, and MFE services through your existing deployment process. This implementation does not
-change the running deployment automatically.
-
-Check effective configuration in **both services** after rebuilding:
-
-```bash
-tutor local run lms ./manage.py lms check
-tutor local run cms ./manage.py cms check
-```
-
-For a mounted development checkout, install it inside the container's Python environment as well;
-a host-side editable install does not make it available to containers.
 
 ## Settings
 
 All restriction settings are namespaced `OPENEDX_ACCOUNT_LOCK_`. Defaults live in `conf.py`.
-Set them in your deployment settings/Tutor settings patch; package edits are unnecessary.
+Set them in your deployment settings; package edits are unnecessary.
 
 ```python
 OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS = (
@@ -64,12 +52,6 @@ One element configures one course. An empty tuple denies all managed-account cou
 enrollment. Catalogs remain browsable. IDs must be opaque course keys, not display names or course
 numbers. Existing enrollments in disallowed courses do not grant access. No automatic enrollment
 is performed; use normal Open edX enrollment tools after provisioning.
-
-The Tutor account-lock plugin owns `ACCOUNT_LOCK_ALLOWED_COURSE_IDS` and
-`ACCOUNT_LOCK_FALLBACK_URL`, rendering the equivalent Django settings in LMS and CMS. Keep
-account-lock settings out of unrelated Tutor plugins so a later patch cannot overwrite the
-allowlist. The default local course is `course-v1:diffOrg+DemoX+summer_2026`, and the fallback is
-`/learner-dashboard`.
 
 `OPENEDX_ACCOUNT_LOCK_RESTRICTED_API_PREFIXES` includes the requested six prefixes plus
 `/api/profile_images/` and `/api/change_email_settings`. Replacing this setting replaces the whole
@@ -104,30 +86,19 @@ The middleware is synchronous; Django adapts it for ASGI without leaking request
 
 ## MFE gateway
 
-The Tutor patch adds Caddy `forward_auth` for `/account`, `/profile`, and `/learning/course`
-and their descendants. It authenticates against the LMS endpoint using existing cookies or the
-Authorization header. Caddy overwrites the original-URL header; no asserted user-ID header is trusted.
-The endpoint validates the original URL against `OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS`, returns 204
-for an allowed request, and returns JSON 403 for direct/API requests. Caddy marks its MFE
-authorization subrequest with `X-Account-Lock-MFE-Gateway: 1`; blocked MFE entries receive a safe
-302 to their referring page, or to `/learner-dashboard` when the referrer is missing or unsafe.
-Responses are private and uncached.
+An external gateway can authorize account, profile, and learning MFE requests through the LMS
+endpoint `/api/account-lock/v1/authorize`. Configure the gateway to send the exact original URL in
+`X-Account-Lock-Original-Url`, forward the user's authentication cookies or Authorization header,
+and set `X-Account-Lock-MFE-Gateway: 1` on its authorization subrequest. The endpoint validates the
+URL against `OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS`, returns 204 for allowed requests, and returns a JSON
+403 for blocked direct/API requests. Marked gateway denials redirect to a safe referring page or the
+configured fallback. The endpoint does not trust client-supplied identity headers.
 
-Production origins are derived from `ENABLE_HTTPS` and `MFE_HOST`. The configured external scheme
-is used even when the proxy-to-Caddy hop is HTTP. Ensure auth cookies actually reach the MFE host
-and are forwarded to LMS. Independent browser origins must use the deployment's normal Open edX
-cookie configuration; do not solve cookie issues by trusting client-supplied identity headers.
-
-Webpack development servers bypass the production MFE Caddy server. Put the development server
-behind the same gateway (proxy its allowed requests onward to the webpack port), or treat that
-server as unprotected. Add exact origins with ports, for example
-`http://apps.local.openedx.io:1997`, to `OPENEDX_ACCOUNT_LOCK_MFE_ORIGINS`; never use wildcards.
-Simply setting `MFE_GATEWAY_ENABLED=True` does not install a development reverse proxy, and
-opening the webpack server directly cannot exercise the redirect behavior.
-
-Without Tutor, install equivalent gateway rules and configure `MFE_ORIGINS` and
-`MFE_GATEWAY_ENABLED=True`. `REQUIRE_MFE_GATEWAY=False` is only for installations that do not serve
-independent account/profile MFEs; it does not make a Django-only deployment protect static MFEs.
+Configure exact public MFE origins, including development ports; do not use wildcards. The gateway
+must preserve the browser's `Referer` header and route all public account/profile MFE entry paths
+through authorization. A directly accessed webpack server bypasses the gateway. Tutor deployments
+can use the separately maintained [Tutor account-lock plugin](https://github.com/skilredi/tutor-skilredi-account-lock)
+for its gateway configuration.
 
 ## Creating and administering users
 
