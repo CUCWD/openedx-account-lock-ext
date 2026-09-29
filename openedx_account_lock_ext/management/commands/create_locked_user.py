@@ -5,12 +5,15 @@ import sys
 from typing import Any
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError, transaction
+from opaque_keys import InvalidKeyError
+from opaque_keys.edx.keys import CourseKey
 
 from openedx_account_lock_ext.conf import GROUP
 
@@ -53,6 +56,7 @@ class Command(BaseCommand):
                 user.save()
                 user.groups.add(group)
                 self._ensure_profile(user, options)
+                self._enroll_allowed_courses(user)
         except ValidationError as exc:
             raise CommandError("; ".join(exc.messages)) from exc
         except IntegrityError as exc:
@@ -111,3 +115,19 @@ class Command(BaseCommand):
             profile, _ = model.objects.get_or_create(user=user)
             profile.name = " ".join(part for part in (options["first_name"], options["last_name"]) if part)
             profile.save(update_fields=["name"])
+
+    @staticmethod
+    def _enroll_allowed_courses(user):
+        if apps.is_installed("common.djangoapps.student"):
+            course_keys = []
+            for course_id in getattr(settings, "OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS", ()):
+                try:
+                    course_keys.append(CourseKey.from_string(str(course_id)))
+                except (InvalidKeyError, TypeError, ValueError) as exc:
+                    raise CommandError(
+                        "Invalid course ID in OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS: "
+                        f"{course_id!r}."
+                    ) from exc
+            enrollment = apps.get_model("student", "CourseEnrollment")
+            for course_key in course_keys:
+                enrollment.enroll(user, course_key)

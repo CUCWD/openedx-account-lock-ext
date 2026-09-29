@@ -1,12 +1,16 @@
 """Provisioning validation, activation, duplicate protection, and atomicity."""
 
 import io
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.test import override_settings
+from opaque_keys.edx.keys import CourseKey
+
+from openedx_account_lock_ext.management.commands.create_locked_user import Command
 
 pytestmark = pytest.mark.django_db
 
@@ -33,6 +37,47 @@ def test_create(django_user_model):
     assert user.first_name == "Demo" and user.last_name == "Learner"
     assert user.check_password("strong-password-2026")
     assert user.groups.filter(name="locked_account").exists()
+
+
+def test_auto_enroll_uses_course_keys():
+    """Configured course ID strings are parsed before calling Open edX enrollment."""
+    user = Mock()
+    enrollment = Mock()
+    course_id = "course-v1:DemoX+Demo_Course+2026"
+    with (
+        override_settings(OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS=[course_id]),
+        patch(
+            "openedx_account_lock_ext.management.commands.create_locked_user.apps.is_installed",
+            return_value=True,
+        ),
+        patch(
+            "openedx_account_lock_ext.management.commands.create_locked_user.apps.get_model",
+            return_value=enrollment,
+        ),
+    ):
+        Command._enroll_allowed_courses(user)
+
+    enrollment.enroll.assert_called_once_with(user, CourseKey.from_string(course_id))
+
+
+def test_auto_enroll_rejects_invalid_course_ids():
+    """Invalid configured course IDs raise a clear error before any enrollment call."""
+    user = Mock()
+    enrollment = Mock()
+    with (
+        override_settings(OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS=["invalid-course-id"]),
+        patch(
+            "openedx_account_lock_ext.management.commands.create_locked_user.apps.is_installed",
+            return_value=True,
+        ),
+        patch(
+            "openedx_account_lock_ext.management.commands.create_locked_user.apps.get_model",
+            return_value=enrollment,
+        ),
+        pytest.raises(CommandError, match="OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS"),
+    ):
+        Command._enroll_allowed_courses(user)
+    enrollment.enroll.assert_not_called()
 
 
 @pytest.mark.parametrize(
