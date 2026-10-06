@@ -69,4 +69,5 @@ def relevant(request, kwargs):
         or conf.matches_any(request.path_info, conf.get("RESTRICTED_PAGE_PATHS"))
         or route_name(request) in ACCOUNT_ROUTES
         or courses.protected(request, kwargs)
+        or courses.learner_courses_path(request.path_info)
     )

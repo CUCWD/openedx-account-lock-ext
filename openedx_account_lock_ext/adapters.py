@@ -6,7 +6,7 @@ from types import FunctionType
 from rest_framework.exceptions import APIException
 from rest_framework.views import APIView
 
-from . import conf, policy, recovery
+from . import conf, courses, policy, recovery
 from .identity import is_locked
 from .responses import DETAIL
 
@@ -40,6 +40,8 @@ class GuardMixin(APIView):
                 response.data = {
                     key: value for key, value in response.data.items() if key in conf.get("BOOTSTRAP_FIELDS")
                 }
+            if request.method in {"GET", "HEAD"} and 200 <= response.status_code < 300:
+                response.data = courses.filter_learner_courses(request.path_info, response.data)
         return super().finalize_response(request, response, *args, **kwargs)
 
 

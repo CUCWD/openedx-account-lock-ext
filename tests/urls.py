@@ -51,6 +51,25 @@ class JwtGateway(GatewayAuthorization):
     authentication_classes = (JwtAuthentication, SessionAuthentication)
 
 
+class LearnerCoursesView(ViewSet):
+    """Return Teak-shaped learner-home and enrollment-list fixtures."""
+
+    authentication_classes = (HeaderAuthentication, SessionAuthentication)
+    permission_classes = (AllowAny,)
+
+    def list(self, request):
+        courses = [
+            {"course": {"courseName": "Allowed"}, "courseRun": {"courseId": "course-v1:Demo+Allowed+2026"}},
+            {"course": {"courseName": "Disallowed"}, "courseRun": {"courseId": "course-v1:Other+Course+2026"}},
+        ]
+        if request.path_info == "/api/learner_home/init":
+            return Response({"courses": courses, "welcome_message": "Hello"})
+        return Response([
+            {"course_details": {"course_id": "course-v1:Demo+Allowed+2026"}},
+            {"course_details": {"course_id": "course-v1:Other+Course+2026"}},
+        ])
+
+
 def page(request, **kwargs):
     """Supply an ordinary HTML route with a handler-execution sentinel."""
     return JsonResponse({"rendered": True})

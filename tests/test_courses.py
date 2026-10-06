@@ -40,6 +40,44 @@ def test_enrollment_payload(logged):
         assert response.status_code == status
 
 
+@pytest.mark.parametrize(
+    "path,collection",
+    [("/api/learner_home/init", "courses"), ("/api/enrollment/v1/enrollment", None)],
+)
+def test_locked_dashboard_hides_disallowed_enrollments(logged, path, collection):
+    response = logged.get(path)
+    assert response.status_code == 200
+    data = response.json()
+    entries = data[collection] if collection else data
+    assert len(entries) == 1
+    if collection:
+        assert entries[0]["courseRun"]["courseId"] == ALLOWED
+    else:
+        assert entries[0]["course_details"]["course_id"] == ALLOWED
+
+
+def test_locked_dashboard_empty_allowlist_hides_all_courses(logged, settings):
+    settings.OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS = []
+    assert logged.get("/api/learner_home/init").json()["courses"] == []
+    assert logged.get("/api/enrollment/v1/enrollment").json() == []
+
+
+def test_locked_dashboard_tracks_allowlist_changes(logged, settings):
+    settings.OPENEDX_ACCOUNT_LOCK_ALLOWED_COURSE_IDS = [OTHER]
+    response = logged.get("/api/learner_home/init")
+    assert [item["courseRun"]["courseId"] for item in response.json()["courses"]] == [OTHER]
+    response = logged.get("/api/enrollment/v1/enrollment")
+    assert [item["course_details"]["course_id"] for item in response.json()] == [OTHER]
+
+
+def test_unlocked_dashboard_keeps_all_enrollments(client, django_user_model):
+    user = django_user_model.objects.create_user("unlocked", password="testing-password")
+    client.force_login(user)
+    response = client.get("/api/learner_home/init")
+    assert response.status_code == 200
+    assert len(response.json()["courses"]) == 2
+
+
 def test_conflicting_query(logged):
     """Neither URL/body conflicts nor duplicate query parameters can authorize a resource."""
     assert logged.get(f"/api/course_home/outline/{ALLOWED}?course_id={OTHER}").status_code == 403

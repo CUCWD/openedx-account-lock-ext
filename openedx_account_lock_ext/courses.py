@@ -12,6 +12,7 @@ from . import conf
 
 COURSE_FIELDS = ("course_id", "course_key", "course_key_string", "courseId", "course")
 USAGE_FIELDS = ("usage_key", "usage_id", "block_id", "block_key", "usage_key_string")
+LEARNER_COURSE_COLLECTIONS = frozenset({"courses", "enrollments", "course_enrollments", "results"})
 CATALOG_PATHS = (
     "/api/courses/v1/courses",
     "/api/courses/v2/courses",
@@ -57,6 +58,55 @@ def allowed(value):
         return canonical(value) in {canonical(item) for item in conf.get("ALLOWED_COURSE_IDS")}
     except UnresolvedCourse:
         return False
+
+
+def filter_learner_courses(path, data):
+    """Remove disallowed courses from learner-home and enrollment-list payloads."""
+    path = conf.normalized(path)
+    enrollment_list = path == "/api/enrollment/v1/enrollment"
+    learner_home = path == "/api/learner_home/init"
+    if not (enrollment_list or learner_home):
+        return data
+
+    def course_id(item):
+        if not isinstance(item, Mapping):
+            return None
+        details = item.get("course_details")
+        values = [item.get(name) for name in COURSE_FIELDS if isinstance(item.get(name), str)]
+        if isinstance(details, Mapping):
+            values.extend(details.get(name) for name in COURSE_FIELDS if isinstance(details.get(name), str))
+        # Teak learner-home cards put the opaque course key on courseRun.
+        course_run = item.get("courseRun")
+        if isinstance(course_run, Mapping):
+            values.extend(course_run.get(name) for name in COURSE_FIELDS if isinstance(course_run.get(name), str))
+        identifier = item.get("id")
+        if isinstance(identifier, str) and identifier.startswith("course-v1:"):
+            values.append(identifier)
+        return next((value for value in values if value is not None), None)
+
+    def keep(item):
+        identifier = course_id(item)
+        return identifier is not None and allowed(identifier)
+
+    def visit(value, root=False):
+        if isinstance(value, list):
+            return [visit(item) for item in value if not root or keep(item)]
+        if isinstance(value, dict):
+            result = dict(value)
+            for key, child in value.items():
+                if isinstance(child, list) and key in LEARNER_COURSE_COLLECTIONS:
+                    result[key] = [visit(item) for item in child if keep(item)]
+                else:
+                    result[key] = visit(child)
+            return result
+        return value
+
+    return visit(data, root=enrollment_list and isinstance(data, list))
+
+
+def learner_courses_path(path):
+    """Identify course-list endpoints that need response filtering but remain readable."""
+    return conf.normalized(path) in {"/api/learner_home/init", "/api/enrollment/v1/enrollment"}
 
 
 def usage_course(value):
