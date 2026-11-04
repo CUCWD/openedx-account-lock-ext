@@ -1,0 +1,7 @@
+# Isolated tooling for GitHub Actions and package validation.
+-c constraints.txt
+
+tox
+build
+# Twine 7 requires packaging>=26.1; Ulmo supplies packaging 25.0.
+twine<7

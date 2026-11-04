@@ -51,13 +51,14 @@ class JwtGateway(GatewayAuthorization):
     authentication_classes = (JwtAuthentication, SessionAuthentication)
 
 
-class LearnerCoursesView(ViewSet):
+class LearnerCoursesView(ResourceView):
     """Return Teak-shaped learner-home and enrollment-list fixtures."""
 
     authentication_classes = (HeaderAuthentication, SessionAuthentication)
     permission_classes = (AllowAny,)
 
     def list(self, request):
+        """Expose course collections through the actual guarded DRF response path."""
         courses = [
             {"course": {"courseName": "Allowed"}, "courseRun": {"courseId": "course-v1:Demo+Allowed+2026"}},
             {"course": {"courseName": "Disallowed"}, "courseRun": {"courseId": "course-v1:Other+Course+2026"}},
@@ -91,6 +92,7 @@ def request_scope(request):
 resource = ResourceView.as_view(
     {"get": "retrieve", "post": "write", "put": "write", "patch": "write", "delete": "write"}
 )
+learner_courses = LearnerCoursesView.as_view({"get": "list", "post": "write"})
 urlpatterns = [
     path("api/account-lock/v1/authorize-jwt", JwtGateway.as_view()),
     path("api/user/v2/account/decorated", require_GET(resource)),
@@ -105,7 +107,8 @@ urlpatterns = [
     re_path(r"^api/discussion/v1/threads/(?P<thread_id>[^/]+)/?$", resource),
     re_path(r"^api/discussion/v1/comments/(?P<comment_id>[^/]+)/?$", resource),
     path("api/discussion/v1/threads", resource),
-    path("api/enrollment/v1/enrollment", resource),
+    path("api/learner_home/init", learner_courses),
+    path("api/enrollment/v1/enrollment", learner_courses),
     path("api/courses/v1/courses/", resource),
     path("password_reset/", page, name="password_reset"),
     re_path(r"^password_reset_confirm/(?P<uidb36>[^-]+)-(?P<token>[^/]+)/$", page, name="password_reset_confirm"),

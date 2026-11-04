@@ -23,7 +23,7 @@ def test_restricted_pages(logged, path):
     """Protected HTML pages never reach their view."""
     response = logged.get(path)
     assert response.status_code == 302
-    assert response.url == "/learner-dashboard"
+    assert response.url == "/learner-dashboard/"
     assert [str(message) for message in get_messages(response.wsgi_request)] == [
         "This page is restricted for managed accounts.",
     ]
@@ -126,17 +126,17 @@ def test_bearer_without_session(client, locked):
     [
         ("http://testserver/welcome?x=1", "http://testserver/welcome?x=1"),
         ("/welcome", "/welcome"),
-        (None, "/learner-dashboard"),
-        ("https://evil.test/", "/learner-dashboard"),
-        ("//evil.test/", "/learner-dashboard"),
-        ("javascript:alert(1)", "/learner-dashboard"),
-        ("http://testserver@evil.test/", "/learner-dashboard"),
-        ("/profile/demo", "/learner-dashboard"),
-        ("/account/settings", "/learner-dashboard"),
-        ("/courses/course-v1:Other+X+Run/courseware", "/learner-dashboard"),
-        ("/learning/course/course-v1:Other+X+Run/home", "/learner-dashboard"),
-        ("/account", "/learner-dashboard"),
-        ("\\\\evil.test", "/learner-dashboard"),
+        (None, "/learner-dashboard/"),
+        ("https://evil.test/", "/learner-dashboard/"),
+        ("//evil.test/", "/learner-dashboard/"),
+        ("javascript:alert(1)", "/learner-dashboard/"),
+        ("http://testserver@evil.test/", "/learner-dashboard/"),
+        ("/profile/demo", "/learner-dashboard/"),
+        ("/account/settings", "/learner-dashboard/"),
+        ("/courses/course-v1:Other+X+Run/courseware", "/learner-dashboard/"),
+        ("/learning/course/course-v1:Other+X+Run/home", "/learner-dashboard/"),
+        ("/account", "/learner-dashboard/"),
+        ("\\\\evil.test", "/learner-dashboard/"),
     ],
 )
 def test_referrers(logged, referrer, expected):
@@ -145,12 +145,13 @@ def test_referrers(logged, referrer, expected):
     assert logged.get("/account/settings", **headers).url == expected
 
 
-def test_https_and_fallback(logged, settings):
+@pytest.mark.parametrize("fallback", ["https://evil.test", "/profile/demo", "/api/user/v1/accounts/demo"])
+def test_https_and_fallback(logged, settings, fallback):
     """Reject HTTPS downgrades and validate the configured fallback at runtime."""
     settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "/welcome"
     assert logged.get("/profile", secure=True, HTTP_REFERER="http://testserver/old").url == "/welcome"
-    settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "https://evil.test"
-    assert logged.get("/profile").url == "/learner-dashboard"
+    settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = fallback
+    assert logged.get("/profile").url == "/learner-dashboard/"
 
 
 def test_group_cache_per_request(logged, locked, django_assert_num_queries, rf):
@@ -163,3 +164,13 @@ def test_group_cache_per_request(logged, locked, django_assert_num_queries, rf):
         assert is_locked(locked, request)
     locked.groups.clear()
     assert logged.get("/profile").status_code == 200
+
+
+def test_unsafe_default_fallback_denies_without_redirect(logged, settings):
+    """A blocked default destination cannot create a redirect loop."""
+    settings.OPENEDX_ACCOUNT_LOCK_FALLBACK_URL = "https://evil.test"
+    settings.OPENEDX_ACCOUNT_LOCK_RESTRICTED_PAGE_PATHS = ["/profile", "/learner-dashboard"]
+    response = logged.get("/profile/demo")
+    assert response.status_code == 403
+    assert response.json()["error"] == "account_locked"
+    assert "Location" not in response

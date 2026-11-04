@@ -23,7 +23,9 @@ class GatewayAuthorization(APIView):
         original_url = request.headers.get("X-Account-Lock-Original-Url", "")
         try:
             parsed = urlsplit(original_url)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
+            # Ulmo's pycodestyle 2.8 misreads URL f-strings on Python 3.12.
+            # pylint: disable-next=consider-using-f-string
+            origin = "{}://{}".format(parsed.scheme, parsed.netloc)
             valid = (
                 origin in conf.get("MFE_ORIGINS")
                 and parsed.scheme in {"http", "https"}

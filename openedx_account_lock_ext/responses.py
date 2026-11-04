@@ -43,7 +43,9 @@ def safe_destination(request, destination, allowed_origins=()):
     except ValueError:
         return False
     if allowed_origins and (parsed.scheme or parsed.netloc):
-        if f"{parsed.scheme}://{parsed.netloc}" not in set(allowed_origins):
+        # Ulmo's pycodestyle 2.8 misreads URL f-strings on Python 3.12.
+        # pylint: disable-next=consider-using-f-string
+        if "{}://{}".format(parsed.scheme, parsed.netloc) not in set(allowed_origins):
             return False
     elif not url_has_allowed_host_and_scheme(
         destination,
@@ -76,18 +78,22 @@ def mfe_gateway_blocked(request):
     """Redirect a blocked MFE entry only when Caddy marks the auth request."""
     if request.headers.get("X-Account-Lock-MFE-Gateway") != "1":
         return json_denial()
-    allowed_origins = (*conf.get("MFE_ORIGINS"), f"{request.scheme}://{request.get_host()}")
+    # Ulmo's pycodestyle 2.8 misreads URL f-strings on Python 3.12.
+    # pylint: disable-next=consider-using-f-string
+    allowed_origins = (*conf.get("MFE_ORIGINS"), "{}://{}".format(request.scheme, request.get_host()))
     destination = request.META.get("HTTP_REFERER")
     usable_referrer = safe_destination(request, destination, allowed_origins=allowed_origins)
     if usable_referrer:
         parsed = urlsplit(destination)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
+        # Ulmo's pycodestyle 2.8 misreads URL f-strings on Python 3.12.
+        # pylint: disable-next=consider-using-f-string
+        origin = "{}://{}".format(parsed.scheme, parsed.netloc)
         path = unquote(parsed.path) or "/"
         usable_referrer = not (origin in set(conf.get("MFE_ORIGINS")) and path == "/")
     if not usable_referrer:
         destination = conf.get("FALLBACK_URL")
     if not safe_destination(request, destination, allowed_origins=allowed_origins):
-        destination = "/learner-dashboard/"
+        destination = conf.DEFAULTS["FALLBACK_URL"]
     if not safe_destination(request, destination, allowed_origins=allowed_origins):
         return json_denial()
     response = redirect(destination)
@@ -104,7 +110,7 @@ def blocked(request):
     if not safe_destination(request, destination):
         destination = conf.get("FALLBACK_URL")
     if not safe_destination(request, destination):
-        destination = "/dashboard"
+        destination = conf.DEFAULTS["FALLBACK_URL"]
     if not safe_destination(request, destination):
         return json_denial()
     messages.warning(request, WARNING)
