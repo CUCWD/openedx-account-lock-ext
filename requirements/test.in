@@ -1,0 +1,2 @@
+-c constraints.txt
+# Runtime and test dependencies are compiled from pyproject.toml with --extra=test.

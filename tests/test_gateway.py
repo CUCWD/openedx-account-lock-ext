@@ -86,6 +86,7 @@ def test_mfe_gateway_redirects_or_falls_back(client, locked, settings, url, refe
         "http://apps.example.org:1996",
     ]
     headers = {
+        "HTTP_AUTHORIZATION": "Bearer demo",
         "HTTP_X_ACCOUNT_LOCK_MFE_GATEWAY": "1",
         "HTTP_X_ACCOUNT_LOCK_ORIGINAL_URL": url,
     }
@@ -96,13 +97,15 @@ def test_mfe_gateway_redirects_or_falls_back(client, locked, settings, url, refe
     assert response.url == expected
 
 
-@pytest.mark.parametrize("accept", ["application/json", "text/html", "*/*", ""])
+@pytest.mark.parametrize("accept", ["application/json", "text/html", "*/*", None])
 def test_unmarked_mfe_denial_remains_json(client, locked, accept):
     """Direct gateway requests remain JSON-denied regardless of browser headers."""
+    headers = {"HTTP_ACCEPT": accept} if accept is not None else {}
     response = client.get(
         "/api/account-lock/v1/authorize",
-        HTTP_ACCEPT=accept,
+        HTTP_AUTHORIZATION="Bearer demo",
         HTTP_X_ACCOUNT_LOCK_ORIGINAL_URL="https://apps.example.org/account",
+        **headers,
     )
     assert response.status_code == 403
     assert response.json()["error"] == "account_locked"
@@ -113,6 +116,7 @@ def test_mfe_malformed_url_remains_json(client, locked):
     """Malformed gateway input is rejected even when Caddy marks the request."""
     response = client.get(
         "/api/account-lock/v1/authorize",
+        HTTP_AUTHORIZATION="Bearer demo",
         HTTP_X_ACCOUNT_LOCK_MFE_GATEWAY="1",
         HTTP_X_ACCOUNT_LOCK_ORIGINAL_URL="https://apps.example.org/account/../profile",
     )
@@ -133,3 +137,17 @@ def test_anonymous_and_staff(client, locked):
         ).status_code
         == 204
     )
+
+
+@pytest.mark.parametrize("accept", ["", "application/xml"])
+def test_unsupported_accept_retains_native_drf_denial(client, locked, accept):
+    """Unsupported response formats fail negotiation before gateway policy runs."""
+    response = client.get(
+        "/api/account-lock/v1/authorize",
+        HTTP_AUTHORIZATION="Bearer demo",
+        HTTP_ACCEPT=accept,
+        HTTP_X_ACCOUNT_LOCK_ORIGINAL_URL="https://apps.example.org/account",
+    )
+    assert response.status_code == 406
+    assert response.data["detail"].code == "not_acceptable"
+    assert "Location" not in response

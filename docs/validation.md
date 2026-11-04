@@ -1,5 +1,35 @@
 # Validation and release acceptance
 
+## Ulmo CI validation (2026-11-04)
+
+The complete tox suite passes locally on Python 3.12 with Django 5.2.11 and
+shared dependencies constrained to Ulmo:
+
+- Main suite: **167 passed**, with **90%** statement coverage; Django system checks passed.
+- Custom user suite: **2 passed**; Django reports only the test model's default
+  primary-key warning.
+- Quality: pylint (10/10), pycodestyle, pydocstyle, isort, and mypy passed.
+- Source/wheel builds and strict Twine validation passed.
+- Python 3.11 and the updated GitHub Actions run remain for CI validation.
+
+The 38 failures in the previous GitHub run are resolved. Dashboard routes now
+use the learner-course fixtures, and managed-user gateway requests authenticate
+with the test bearer authenticator. Redirect expectations include the default
+learner-dashboard trailing slash. An unsafe configured fallback now uses the
+same default for ordinary pages and MFE requests, and still returns JSON denial
+if that destination is unsafe. Regression tests cover unsafe fallbacks and
+redirect-loop prevention. Missing Accept headers and unsupported media types
+are tested separately, retaining DRF's native 406 negotiation response.
+
+The redundant configuration-check local variable that caused the Pylint failure
+has been removed. Ulmo dependency constraints and all CI quality gates are retained.
+The requirements consolidate Ulmo's platform and common constraint rules in
+`ulmo-constraints.txt`, referenced by the `constraints.txt` wrapper. The quality
+lock uses Ulmo's pycodestyle 2.8.0; URL formatting remains compatible with that
+checker on Python 3.12.
+
+## Historical Teak validation
+
 Verified on 2026-09-17: **141 standalone tests passed**, **2 custom-user-model tests passed**,
 and standalone plugin statement coverage was **90%**. The complete tox quality environment passed
 (pylint 10/10, pycodestyle, pydocstyle, isort, mypy), as did Django checks. Native LMS and CMS URL/
@@ -13,16 +43,11 @@ installed enrollment filter, and Teak's actual `JwtAuthentication` and split-coo
 Forum ownership and pending-email records are isolated with test doubles where a running platform
 service/model is unavailable. Custom email-login user tests run in a separate Django process.
 
-Commands used from the source workspace, using a temporary Python 3.12 environment:
+Current standalone commands from the plugin checkout (Python 3.11 or 3.12):
 
 ```bash
-VIRTUALENV_OVERRIDE_APP_DATA=/private/tmp/account-lock-virtualenv \
-  /private/tmp/account-lock-venv/bin/python -m tox \
-  -e py312-django42,custom-user,quality --workdir /private/tmp/account-lock-tox-verified
-
-/private/tmp/account-lock-venv/bin/python -m mypy openedx_account_lock_ext
-/private/tmp/account-lock-venv/bin/python -m build
-/private/tmp/account-lock-venv/bin/python -m twine check dist/*
+python -m pip install -r requirements/pip.txt -r requirements/ci.txt
+tox -e django52,custom-user,quality,docs
 ```
 
 Tox runs Django system checks, pytest, pylint, pycodestyle, pydocstyle, isort checks, and mypy.

@@ -1,0 +1,4 @@
+-c constraints.txt
+build
+# Twine 7 requires packaging>=26.1; Ulmo pins packaging 25.0.
+twine<7

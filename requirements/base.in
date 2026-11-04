@@ -1,0 +1,7 @@
+# Runtime versions belong to the host edx-platform environment.
+# Keep compiled pins and Ulmo constraints out of package metadata.
+Django
+djangorestframework
+edx-opaque-keys
+openedx-filters
+edx-django-utils

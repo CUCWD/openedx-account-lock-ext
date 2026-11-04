@@ -26,8 +26,9 @@ def account_lock_checks(app_configs, **kwargs):  # pylint: disable=unused-argume
     fallback = conf.get("FALLBACK_URL")
     try:
         parsed = urlsplit(fallback)
-        path = parsed.path
-        origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+        # Ulmo's pycodestyle 2.8 misreads URL f-strings on Python 3.12.
+        # pylint: disable-next=consider-using-f-string
+        origin = "{}://{}".format(parsed.scheme, parsed.netloc) if parsed.scheme and parsed.netloc else ""
         is_local_path = (
             fallback.startswith("/")
             and not fallback.startswith("//")
@@ -37,14 +38,14 @@ def account_lock_checks(app_configs, **kwargs):  # pylint: disable=unused-argume
         is_configured_mfe_url = (
             origin in set(conf.get("MFE_ORIGINS"))
             and parsed.scheme in {"http", "https"}
-            and bool(path)
+            and bool(parsed.path)
         )
         valid = (
             (is_local_path or is_configured_mfe_url)
             and "\\" not in fallback
-            and path.startswith("/")
-            and not conf.matches_any(path, conf.get("RESTRICTED_PAGE_PATHS"))
-            and not conf.matches_any(path, conf.get("RESTRICTED_API_PREFIXES"))
+            and parsed.path.startswith("/")
+            and not conf.matches_any(parsed.path, conf.get("RESTRICTED_PAGE_PATHS"))
+            and not conf.matches_any(parsed.path, conf.get("RESTRICTED_API_PREFIXES"))
         )
     except (TypeError, ValueError):
         valid = False
